@@ -137,11 +137,20 @@ class FileCache:
             proxy_config = await self.proxy_manager.get_proxy_config()
             if proxy_config and proxy_config.enabled and proxy_config.proxy_url:
                 proxy_url = proxy_config.proxy_url
+        
+        # Fallback to system environment variables if no proxy configured in DB
+        if not proxy_url:
+            proxy_url = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+            if proxy_url:
+                debug_logger.log_info(f"Using system proxy: {proxy_url}")
 
         # Try method 1: curl_cffi with browser impersonation
         try:
             async with AsyncSession() as session:
+                # Ensure proxies dict is correctly formatted for curl_cffi
+                # curl_cffi expects: {"http": "...", "https": "..."}
                 proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+                
                 headers = {
                     "Accept": "*/*",
                     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",

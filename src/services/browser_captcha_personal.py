@@ -62,6 +62,27 @@ class BrowserCaptchaService:
                     cls._instance = cls(db)
         return cls._instance
 
+    def _find_chrome_executable(self) -> Optional[str]:
+        """查找 Chrome 可执行文件路径"""
+        import platform
+        if platform.system() != "Windows":
+            return None
+            
+        paths = [
+            os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "Google\\Chrome\\Application\\chrome.exe"),
+            os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "Google\\Chrome\\Application\\chrome.exe"),
+            os.path.join(os.environ.get("LocalAppData", ""), "Google\\Chrome\\Application\\chrome.exe"),
+            os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "Microsoft\\Edge\\Application\\msedge.exe"),
+            os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "Microsoft\\Edge\\Application\\msedge.exe"),
+        ]
+        
+        for path in paths:
+            if os.path.exists(path):
+                debug_logger.log_info(f"[BrowserCaptcha] 找到浏览器: {path}")
+                return path
+                
+        return None
+
     async def initialize(self):
         """初始化 nodriver 浏览器"""
         if self._initialized and self.browser:
@@ -82,12 +103,15 @@ class BrowserCaptchaService:
 
             # 确保 user_data_dir 存在
             os.makedirs(self.user_data_dir, exist_ok=True)
+            
+            # 查找浏览器路径
+            browser_path = self._find_chrome_executable()
 
             # 启动 nodriver 浏览器
             self.browser = await uc.start(
                 headless=self.headless,
                 user_data_dir=self.user_data_dir,
-                sandbox=False,  # nodriver 需要此参数来禁用 sandbox
+                browser_executable_path=browser_path,
                 browser_args=[
                     '--no-sandbox',
                     '--disable-dev-shm-usage',

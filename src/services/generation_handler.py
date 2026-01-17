@@ -578,7 +578,18 @@ class GenerationHandler:
                 yield self._create_error_response("生成结果为空")
                 return
 
-            image_url = media[0]["image"]["generatedImage"]["fifeUrl"]
+            # 记录完整 media 对象以便调试
+            debug_logger.log_info(f"[DEBUG] Media response: {json.dumps(media[0], ensure_ascii=False)}")
+
+            generated_image = media[0].get("image", {}).get("generatedImage", {})
+            image_url = generated_image.get("fifeUrl")
+            
+            # 尝试获取更高清的图片 (FIFE URL hack)
+            # 如果是 googleusercontent.com，追加 =s0 获取原图
+            if image_url and "googleusercontent.com" in image_url:
+                if "=s" not in image_url:
+                    image_url += "=s0"
+                    debug_logger.log_info(f"[GENERATION] Modified FIFE URL for original size: {image_url}")
 
             # 缓存图片 (如果启用)
             local_url = image_url

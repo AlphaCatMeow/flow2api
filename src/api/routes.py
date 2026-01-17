@@ -29,7 +29,7 @@ async def retrieve_image_data(url: str) -> Optional[bytes]:
     """
     智能获取图片数据：
     1. 优先检查是否为本地 /tmp/ 缓存文件，如果是则直接读取磁盘
-    2. 如果本地不存在或是外部链接，则进行网络下载
+    2. 如果本地不存在或是外部链接，则调用 FileCache 进行下载（支持代理和缓存）
     """
     # 优先尝试本地读取
     try:
@@ -45,10 +45,23 @@ async def retrieve_image_data(url: str) -> Optional[bytes]:
     except Exception as e:
         debug_logger.log_warning(f"[CONTEXT] 本地缓存读取失败: {str(e)}")
 
-    # 回退逻辑：网络下载
+    # 回退逻辑：调用 FileCache 下载
     try:
+        if generation_handler and generation_handler.file_cache:
+            debug_logger.log_info(f"[CONTEXT] 尝试使用 FileCache 下载图片: {url}")
+            filename = await generation_handler.file_cache.download_and_cache(url, "image")
+            local_file_path = generation_handler.file_cache.cache_dir / filename
+            if local_file_path.exists():
+                return local_file_path.read_bytes()
+        
+        # 如果 FileCache 不可用，尝试直接下载 (不推荐，但作为最后的兜底)
         async with AsyncSession() as session:
-            response = await session.get(url, timeout=30, impersonate="chrome110", verify=False)
+            # 尝试从环境变量获取代理
+            import os
+            proxy = os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+            proxies = {"http": proxy, "https": proxy} if proxy else None
+            
+            response = await session.get(url, timeout=30, impersonate="chrome110", verify=False, proxies=proxies)
             if response.status_code == 200:
                 return response.content
             else:
