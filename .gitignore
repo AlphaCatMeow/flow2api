@@ -36,6 +36,8 @@ logs.txt
 # IDE
 .vscode/
 .idea/
+.trae/
+.tmp/
 *.swp
 *.swo
 *~
